@@ -3,14 +3,14 @@ from warnings import warn
 
 from torch.utils.data import DataLoader
 
-from lasaft.data.musdb_wrapper import MusdbTrainSet, MusdbValidSetWithGT, MusdbTestSetWithGT, MusdbTrainSetMultiSource
+from lasaft.data.musdb_wrapper import MusdbTrainSet, MusdbValidSetWithGT, MusdbTestSetWithGT, MusdbTrainSetMultiSource, MusdbEvalSetWithGTMultiCondition, MusdbTrainSetMultiCondition
 
 
 class DataProvider(object):
 
     def __init__(self, musdb_root,
                  batch_size, num_workers, pin_memory, n_fft, hop_length, num_frame,
-                 multi_source_training):
+                 multi_source_training, multi_condition=False):
         self.musdb_root = musdb_root
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -19,6 +19,7 @@ class DataProvider(object):
         self.hop_length = hop_length
         self.n_fft = n_fft
         self.multi_source_training = multi_source_training
+        self.multi_condition = multi_condition
 
     def get_training_dataset_and_loader(self):
         if self.multi_source_training:
@@ -26,7 +27,8 @@ class DataProvider(object):
             if self.batch_size % 4 != 0:
                 warn('batch_size % 4 should be zero. automatically adjusted')
                 time.sleep(5)
-
+        elif self.multi_condition:
+            training_set = MusdbTrainSetMultiCondition(self.musdb_root, self.n_fft, self.hop_length, self.num_frame)
         else:
             training_set = MusdbTrainSet(self.musdb_root, self.n_fft, self.hop_length, self.num_frame)
 
@@ -38,8 +40,10 @@ class DataProvider(object):
         return training_set, loader
 
     def get_validation_dataset_and_loader(self):
-        validation_set = MusdbValidSetWithGT(self.musdb_root, self.n_fft, self.hop_length, self.num_frame)
-
+        if not self.multi_condition:
+            validation_set = MusdbValidSetWithGT(self.musdb_root, self.n_fft, self.hop_length, self.num_frame)
+        else:
+            validation_set = MusdbEvalSetWithGTMultiCondition(self.musdb_root, 'valid', self.n_fft, self.hop_length, self.num_frame)
         loader = DataLoader(validation_set, shuffle=False, batch_size=self.batch_size,
                             num_workers=self.num_workers,
                             pin_memory=self.pin_memory)
@@ -47,8 +51,11 @@ class DataProvider(object):
         return validation_set, loader
 
     def get_test_dataset_and_loader(self):
-        test_set = MusdbTestSetWithGT(self.musdb_root, self.n_fft, self.hop_length, self.num_frame)
-
+        if not self.multi_condition:
+            test_set = MusdbTestSetWithGT(self.musdb_root, self.n_fft, self.hop_length, self.num_frame)
+        else:
+            validation_set = MusdbEvalSetWithGTMultiCondition(self.musdb_root, 'test', self.n_fft, self.hop_length,
+                                                              self.num_frame)
         loader = DataLoader(test_set, shuffle=False, batch_size=self.batch_size,
                             num_workers=self.num_workers,
                             pin_memory=self.pin_memory)
