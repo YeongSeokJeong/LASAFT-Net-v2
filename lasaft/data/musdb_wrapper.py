@@ -143,7 +143,7 @@ class MusdbTrainSetMultiCondition(MusdbWrapperDataset):
         source_sample = {target: self.get_random_audio_sample(target) for target in self.source_names}
         while True:
             input_condition = np.array([random.randint(0, 1) for _ in range(len(self.target_names))])
-            stop_gen_condition = sum(input_condition) > 0
+            stop_gen_condition = sum(input_condition) > 1
             input_condition = input_condition / sum(input_condition)
             if stop_gen_condition:
                 input_condition = input_condition.astype(np.float32)
@@ -151,7 +151,7 @@ class MusdbTrainSetMultiCondition(MusdbWrapperDataset):
         mixture = sum(source_sample.values())
         target = np.zeros_like(mixture)
         for i, condition in enumerate(input_condition):
-            if condition == 1:
+            if condition > 0:
                 target += source_sample[self.target_names[i]]
 
 
