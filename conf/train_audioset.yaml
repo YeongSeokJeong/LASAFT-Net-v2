@@ -24,8 +24,6 @@ audioset_dir: ${oc.env:audioset_dir}
 dev_data_dir: ${oc.env:dev_data_dir}
 wandb_api_key: ${oc.env:wandb_api_key}
 
-dataset:
-  batch_size: 1
 hydra:
   run:
     dir: logs/runs/${model.name}/${now:%Y%m%d-%H%M%S}
