@@ -152,3 +152,18 @@ def log_hyperparameters(
         pass
 
     trainer.logger.log_hyperparams = empty
+
+
+def audioset_label_indices(meta_root: str):
+    id2idx = {}
+    id2name = {}
+    with open(f'{meta_root}/class_labels_indices.csv', 'r', encoding='utf8') as f:
+        for line_num, line in enumerate(f.readlines()):
+            if line_num == 0:
+                continue
+            splited_line = line.strip().split(',')
+            idx, id, name = splited_line[0], splited_line[1], ','.join(splited_line[2:]).replace('\"', '')
+            idx, id, name = int(idx.strip()), id.strip(), name.strip().lower()
+            id2idx[id] = idx
+            id2name[id] = name
+    return id2idx, id2name

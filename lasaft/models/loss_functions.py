@@ -27,7 +27,7 @@ def get_conditional_loss(loss_name, window_length, hop_length, **kwargs):
                          'nsdr_44100',
                          'raw_mse', 'distortion', 'kl_lr', 'raw_and_spec',
                          'ncs', 'ncs_44100', 'nlcs',
-                         'spec_l1_multi_source', 'spec_l2_multi_source', 'spec_mse_multi_source']
+                         'spec_l1_multi_source', 'spec_l2_multi_source', 'spec_mse_multi_source', 'audioset_spec']
 
     if loss_name == 'spec_l1':
         return Conditional_Spectrogram_Loss('l1')
@@ -73,6 +73,9 @@ def get_conditional_loss(loss_name, window_length, hop_length, **kwargs):
         return Conditional_NCS_Loss(44100, 22050)
     elif loss_name == 'nlcs':
         return Conditional_NLCS_Loss(window_length, hop_length)
+    elif loss_name == 'audioset_spec':
+        return MoMSpectrogramLoss('l1')
+
 
     else:
         raise ModuleNotFoundError
@@ -325,3 +328,33 @@ class MultiSourceSpectrogramLoss(MultiSourceLoss):
         e_preservation = self.criterion(target_hats.sum(1), mixture_spec)
 
         return {'e_recon': e_recon, 'e_preservation': e_preservation}
+
+
+class MoMLoss(ABC):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+    @abstractmethod
+    def compute(self, *args, **kwargs):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return self.compute(*args, **kwargs)
+
+
+class MoMSpectrogramLoss(MoMLoss):
+    def __init__(self, mode):
+        super().__init__()
+        assert mode in ['l1', 'l2', 'mse'], NotImplementedError
+        self.criterion = f.l1_loss if mode == 'l1' else f.mse_loss
+
+    def compute(self, model, mixture, wav1, wav2, condition1, condition2):
+        wav1_spec = model.to_spec(wav1)
+        wav2_spec = model.to_spec(wav2)
+
+        wav1_hat = model.forward(mixture, condition1)
+        wav2_hat = model.forward(mixture, condition2)
+
+        loss = self.criterion(wav1_hat, wav1_spec) + self.criterion(wav2_hat, wav2_spec)
+
+        return loss

@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from lasaft.data.musdb_wrapper import SingleTrackSet
-from lasaft.models.loss_functions import get_conditional_loss, MultiSourceSpectrogramLoss
+from lasaft.models.loss_functions import get_conditional_loss, MultiSourceSpectrogramLoss, MoMLoss
 from lasaft.models.conditioned.abstract_framework import AbstractSeparator
 from lasaft.utils import fourier
 from lasaft.utils.fourier import get_trim_length
@@ -284,3 +284,31 @@ class AbstractLaSAFTNetWithMultiSource(AbstractLaSAFTNet):
             output_spec = input_spec.unsqueeze(1) * output_spec
 
         return output_spec
+
+
+class AbstractLaSAFTNetforAudioSet(AbstractLaSAFTNet):
+    def __init__(self,
+                 lr, optimizer, initializer,
+                 n_fft, num_frame, hop_length, spec_type, spec_est_mode,
+                 spec2spec, train_loss, val_loss,
+                 name='no_name', norm='bn',
+                 query_listen=True,
+                 key_listen=True
+                 ):
+        super().__init__(lr, optimizer, initializer,
+                         n_fft, num_frame, hop_length, spec_type, spec_est_mode,
+                         spec2spec, train_loss, val_loss,
+                         name, norm, query_listen, key_listen)
+
+        assert isinstance(self.train_loss, MoMLoss)
+
+    def training_step(self, batch, batch_idx):
+        mixture, wav1, wav2, condition1, condition2 = batch
+        loss = self.train_loss(self, mixture, wav1, wav2, condition1, condition2)
+
+        self.log('loss', loss, prog_bar=True, on_epoch=True)
+
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        raise NotImplementedError
