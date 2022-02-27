@@ -63,10 +63,10 @@ class AudiosetWrapper(Dataset):
         return idx
 
     def to_multi_hot(self, label):
-        condition = np.zeros(len(self.id2idx))
+        condition = np.zeros(len(self.id2idx), dtype=np.float32)
         condition[label] = 1.
         condition /= sum(condition)
-        return condition.astype(np.float32)
+        return condition
 
 
 class AudiosetTrainDataset(AudiosetWrapper):

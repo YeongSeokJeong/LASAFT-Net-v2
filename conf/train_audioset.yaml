@@ -27,3 +27,9 @@ wandb_api_key: ${oc.env:wandb_api_key}
 hydra:
   run:
     dir: logs/runs/${model.name}/${now:%Y%m%d-%H%M%S}
+
+callbacks:
+  model_checkpoint:
+    monitor: "train_loss"
+  early_stopping:
+    monitor: "train_loss"
