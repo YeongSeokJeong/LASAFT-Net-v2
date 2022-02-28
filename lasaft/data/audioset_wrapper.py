@@ -10,23 +10,26 @@ from glob import glob
 import soundfile as sf
 from os.path import exists
 
+from lasaft.utils.ontology_processor import search_all_nodes
 
 class AudiosetWrapper(Dataset):
     __metaclass__ = ABCMeta
 
-    def __init__(self, audioset_root, subset, n_fft, hop_length, num_frame):
+    def __init__(self, audioset_root, subset, n_fft, hop_length, num_frame, level=-1):
 
         audioset_root = Path(to_absolute_path(audioset_root))
         meta_path = f'{audioset_root}/meta_data'.replace('\\', '/')
+        self.level = level
         self.window_length = hop_length * (num_frame - 1)
         if subset == 'train':
             self.wav_dict, self.label_dict, self.lengths = self.get_paths(f'{audioset_root}/data/balanced_train_segments'.replace('\\', '/'))
         else:
             self.wav_dict, self.label_dict, self.lengths = self.get_paths(f'{audioset_root}/data/eval_segments'.replace('\\', '/'))
-        self.id2idx, self.id2name = audioset_label_indices(meta_path)
-
+        self.id2name, self.name2id = audioset_label_indices(meta_path)
+        self.nodes = search_all_nodes(f'{audioset_root}/meta_data')
+        self.name2idx = self.check_level()
         self.num_tracks = len(self.wav_dict)
-        self.num_targets = len(self.id2idx)
+        self.num_targets = sum([1 if node.level <= self.level or self.level == -1 else 0 for node in self.nodes])
 
     def get_paths(self, path):
         wav_paths = []
@@ -59,19 +62,30 @@ class AudiosetWrapper(Dataset):
 
     def get_label(self, idx):
         with open(self.label_dict[idx], 'r') as f:
-            idx = [self.id2idx[id.strip()] for id in f.readline().strip().split(',')]
-        return idx
+            idx = [self.name2idx[self.id2name[id.strip()]] for id in f.readline().strip().split(',')]
+        return list(set(idx))
+
+    def check_level(self):
+        name2idx = {}
+        for node in self.nodes:
+            if self.level == -1:
+                continue
+            if node.level > self.level:
+                name2idx[node.name] = node.parents[self.level].idx
+            else:
+                name2idx[node.name] = node.idx
+        return name2idx
 
     def to_multi_hot(self, label):
-        condition = np.zeros(len(self.id2idx), dtype=np.float32)
+        condition = np.zeros(self.num_targets, dtype=np.float32)
         condition[label] = 1.
         condition /= sum(condition)
         return condition
 
 
 class AudiosetTrainDataset(AudiosetWrapper):
-    def __init__(self, audioset_root, n_fft, hop_length, num_frame):
-        super().__init__(audioset_root, 'train', n_fft, hop_length, num_frame)
+    def __init__(self, audioset_root, n_fft, hop_length, num_frame, level):
+        super().__init__(audioset_root, 'train', n_fft, hop_length, num_frame, level)
 
     def __len__(self) -> int:
         return sum([length//self.window_length for length in self.lengths])

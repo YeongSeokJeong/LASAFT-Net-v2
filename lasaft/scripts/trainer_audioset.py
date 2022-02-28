@@ -18,7 +18,12 @@ def train(cfg: DictConfig):
     if cfg['trainer']['resume_from_checkpoint'] is None:
         if cfg['seed'] is not None:
             seed_everything(cfg['seed'], workers=True)
+    dp = HI.data_provider(cfg)
 
+    train_dataset, training_dataloader = dp.get_training_dataset_and_loader()
+    # valid_dataset, validation_dataloader = dp.get_validation_dataset_and_loader() # todo
+
+    cfg['model']['spec2spec']['control_input_dim'] = train_dataset.num_targets
     model = hydra.utils.instantiate(cfg['model'])
 
     if cfg['model']['spec2spec']['last_activation'] != 'identity' and cfg['model']['spec_est_mode'] != 'masking':
@@ -46,7 +51,7 @@ def train(cfg: DictConfig):
                 cfg['logger']['wandb']['tags'].append(model.name)
                 if 'dev' in model.name:
                     cfg['logger']['wandb']['tags'].append('dev_mode')
-                cfg['logger']['wandb']['name'] = '{}_{}_{}'.format(model.name, cfg['seed'], str(model.lr))
+                cfg['logger']['wandb']['name'] = '{}_{}_{}_{}'.format(model.name, cfg['seed'], str(model.lr), cfg['dataset']['level'])
                 wandb_login(key=cfg['wandb_api_key'])
                 logger = hydra.utils.instantiate(cfg['logger']['wandb'])
                 logger.watch(model, log='all')
@@ -54,10 +59,7 @@ def train(cfg: DictConfig):
 
     # Trainer
     trainer = HI.trainer(cfg, callbacks=callbacks, logger=loggers, _convert_="partial")
-    dp = HI.data_provider(cfg)
 
-    train_dataset, training_dataloader = dp.get_training_dataset_and_loader()
-    # valid_dataset, validation_dataloader = dp.get_validation_dataset_and_loader() # todo
 
     if cfg['trainer']['auto_lr_find']:
         lr_find = trainer.tuner.lr_find(model,

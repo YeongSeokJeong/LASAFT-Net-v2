@@ -11,6 +11,7 @@ import wandb
 import pytorch_lightning as pl
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.utilities import rank_zero_only
+from lasaft.utils.ontology_processor import new_audioset_label_indices, mk_new_indices, get_ontology_names
 
 
 def get_activation_by_name(activation):
@@ -155,15 +156,8 @@ def log_hyperparameters(
 
 
 def audioset_label_indices(meta_root: str):
-    id2idx = {}
-    id2name = {}
-    with open(f'{meta_root}/class_labels_indices.csv', 'r', encoding='utf8') as f:
-        for line_num, line in enumerate(f.readlines()):
-            if line_num == 0:
-                continue
-            splited_line = line.strip().split(',')
-            idx, id, name = splited_line[0], splited_line[1], ','.join(splited_line[2:]).replace('\"', '')
-            idx, id, name = int(idx.strip()), id.strip(), name.strip().lower()
-            id2idx[id] = idx
-            id2name[id] = name
-    return id2idx, id2name
+    file_path = f'{meta_root}/new_class_labels_indices.csv'
+    if not os.path.exists(file_path):
+        mk_new_indices(meta_root)
+    id2name, name2id = new_audioset_label_indices(meta_root)
+    return id2name, name2id
