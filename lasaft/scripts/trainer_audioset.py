@@ -49,9 +49,11 @@ def train(cfg: DictConfig):
         for logger in cfg['logger']:
             if logger == 'wandb':
                 cfg['logger']['wandb']['tags'].append(model.name)
+                if 'audioset_root' in cfg['dataset']:
+                    cfg['logger']['wandb']['tags'].append('audioset')
                 if 'dev' in model.name:
                     cfg['logger']['wandb']['tags'].append('dev_mode')
-                cfg['logger']['wandb']['name'] = '{}_{}_{}_{}'.format(model.name, cfg['seed'], str(model.lr), cfg['dataset']['level'])
+                cfg['logger']['wandb']['name'] = '{}_{}_{}_lv{}'.format(model.name, cfg['seed'], str(model.lr), cfg['dataset']['level'])
                 wandb_login(key=cfg['wandb_api_key'])
                 logger = hydra.utils.instantiate(cfg['logger']['wandb'])
                 logger.watch(model, log='all')
