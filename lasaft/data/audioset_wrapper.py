@@ -62,8 +62,22 @@ class AudiosetWrapper(Dataset):
 
     def get_label(self, idx):
         with open(self.label_dict[idx], 'r') as f:
-            idx = [self.name2idx[self.id2name[id.strip()]] for id in f.readline().strip().split(',')]
-        return list(set(idx))
+            node_indexes = [self.name2idx[self.id2name[id.strip()]] for id in f.readline().strip().split(',')]
+
+        for outer_index, outer_node_idx in enumerate(node_indexes):
+            for inner_index, inner_node_idx in enumerate(node_indexes):
+                inner_parents_indexes = [node.idx for node in self.nodes[inner_index].parents]
+                if outer_node_idx in inner_parents_indexes:
+                    node_indexes[inner_index] = outer_node_idx
+        node_indexes = list(set(node_indexes))
+        zero_level_indexes = []
+        for outer_node_idx in node_indexes:
+            parents = self.nodes[outer_node_idx].parents
+            if len(parents) > 0:
+                zero_level_indexes.append(parents[0].idx)
+            else:
+                zero_level_indexes.append(outer_node_idx)
+        return node_indexes, zero_level_indexes
 
     def check_level(self):
         name2idx = {}
@@ -92,12 +106,12 @@ class AudiosetTrainDataset(AudiosetWrapper):
 
     def __getitem__(self, whatever):
         idx1 = random.randint(0, self.num_tracks - 1)
-        wav1, id1 = self.get_random_audio(idx1), self.get_label(idx1)
+        wav1, (id1, zero_level_id1) = self.get_random_audio(idx1), self.get_label(idx1)
 
         while True:
             idx2 = random.randint(0, self.num_tracks - 1)
-            wav2, id2 = self.get_random_audio(idx2), self.get_label(idx2)
-            if set(id1).isdisjoint(id2):
+            wav2, (id2, zero_level_id2) = self.get_random_audio(idx2), self.get_label(idx2)
+            if set(zero_level_id1).isdisjoint(zero_level_id2):
                 break
         mixture = wav1 + wav2
 
@@ -108,3 +122,28 @@ class AudiosetTrainDataset(AudiosetWrapper):
         start_pos = random.randint(0, max_len)
         return self.get_audio(idx, start_pos, self.window_length)
 
+
+class AudiosetValidDataset(AudiosetWrapper):
+    def __init__(self, audioset_root, n_fft, hop_length, num_frame, level):
+        super().__init__(audioset_root, 'valid', n_fft, hop_length, num_frame, level)
+
+    def __len__(self) -> int:
+        return sum([length//self.window_length for length in self.lengths])
+
+    def __getitem__(self, whatever):
+        idx1 = random.randint(0, self.num_tracks - 1)
+        wav1, (id1, zero_level_id1) = self.get_random_audio(idx1), self.get_label(idx1)
+
+        while True:
+            idx2 = random.randint(0, self.num_tracks - 1)
+            wav2, (id2, zero_level_id2) = self.get_random_audio(idx2), self.get_label(idx2)
+            if set(id1).isdisjoint(id2):
+                break
+        mixture = wav1 + wav2
+
+        return mixture, wav1, wav2, self.to_multi_hot(id1), self.to_multi_hot(id2)
+
+    def get_random_audio(self, idx):
+        max_len = self.lengths[idx] - self.window_length - 1
+        start_pos = random.randint(0, max_len)
+        return self.get_audio(idx, start_pos, self.window_length)

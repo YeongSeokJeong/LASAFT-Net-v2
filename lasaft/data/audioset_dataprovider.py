@@ -3,7 +3,7 @@ from warnings import warn
 
 from torch.utils.data import DataLoader
 
-from lasaft.data.audioset_wrapper import AudiosetTrainDataset
+from lasaft.data.audioset_wrapper import AudiosetTrainDataset, AudiosetValidDataset
 
 
 class DataProvider(object):
@@ -34,7 +34,13 @@ class DataProvider(object):
         return training_set, loader
 
     def get_validation_dataset_and_loader(self):
-        raise NotImplementedError
+        validation_set = AudiosetValidDataset(self.audioset_root, self.n_fft, self.hop_length, self.num_frame, self.level)
+
+        batch_size = self.batch_size // 4 if self.multi_source_training else self.batch_size
+        loader = DataLoader(validation_set, shuffle=True, batch_size=batch_size,
+                            num_workers=self.num_workers,
+                            pin_memory=self.pin_memory)
+        return validation_set, loader
 
     def get_test_dataset_and_loader(self):
         raise NotImplementedError
